@@ -23,7 +23,7 @@
 @property (nonatomic, strong) UIWebView *webview;
 @property (nonatomic, assign) CGSize pageSize;
 @property (nonatomic, assign) UIEdgeInsets pageMargins;
-
+@property (nonatomic, strong) NSString *jsMessage;
 @end
 
 @interface UIPrintPageRenderer (PDF)
@@ -82,6 +82,16 @@
 + (id)createPDFWithHTML:(NSString*)HTML baseURL:(NSURL*)baseURL pathForPDF:(NSString*)PDFpath pageSize:(CGSize)pageSize margins:(UIEdgeInsets)pageMargins successBlock:(NDHTMLtoPDFCompletionBlock)successBlock errorBlock:(NDHTMLtoPDFCompletionBlock)errorBlock
 {
     NDHTMLtoPDF *creator = [[NDHTMLtoPDF alloc] initWithHTML:HTML baseURL:baseURL delegate:nil pathForPDF:PDFpath pageSize:pageSize margins:pageMargins];
+    creator.successBlock = successBlock;
+    creator.errorBlock = errorBlock;
+    
+    return creator;
+}
+
++ (id)createPDFWithHTML:(NSString*)HTML baseURL:(NSURL*)baseURL pathForPDF:(NSString*)PDFpath pageSize:(CGSize)pageSize margins:(UIEdgeInsets)pageMargins jsCompletionMessage:(NSString*)jsMessage successBlock:(NDHTMLtoPDFCompletionBlock)successBlock errorBlock:(NDHTMLtoPDFCompletionBlock)errorBlock
+{
+    NDHTMLtoPDF *creator = [[NDHTMLtoPDF alloc] initWithHTML:HTML baseURL:baseURL delegate:nil pathForPDF:PDFpath pageSize:pageSize margins:pageMargins];
+    creator.jsMessage = jsMessage;
     creator.successBlock = successBlock;
     creator.errorBlock = errorBlock;
     
@@ -155,24 +165,22 @@
     }
 }
 
-- (void)webViewDidFinishLoad:(UIWebView *)webView
+- (void)finishedLoading
 {
-    if (webView.isLoading) return;
-    
     UIPrintPageRenderer *render = [[UIPrintPageRenderer alloc] init];
     
-    [render addPrintFormatter:webView.viewPrintFormatter startingAtPageAtIndex:0];
-        
+    [render addPrintFormatter:self.webview.viewPrintFormatter startingAtPageAtIndex:0];
+    
     CGRect printableRect = CGRectMake(self.pageMargins.left,
-                                  self.pageMargins.top,
-                                  self.pageSize.width - self.pageMargins.left - self.pageMargins.right,
-                                  self.pageSize.height - self.pageMargins.top - self.pageMargins.bottom);
+                                      self.pageMargins.top,
+                                      self.pageSize.width - self.pageMargins.left - self.pageMargins.right,
+                                      self.pageSize.height - self.pageMargins.top - self.pageMargins.bottom);
     
     CGRect paperRect = CGRectMake(0, 0, self.pageSize.width, self.pageSize.height);
     
     [render setValue:[NSValue valueWithCGRect:paperRect] forKey:@"paperRect"];
     [render setValue:[NSValue valueWithCGRect:printableRect] forKey:@"printableRect"];
-
+    
     self.PDFdata = [render printToPDF];
     
     if (self.PDFpath) {
@@ -180,15 +188,21 @@
     }
     
     [self terminateWebTask];
-
+    
     if (self.delegate && [self.delegate respondsToSelector:@selector(HTMLtoPDFDidSucceed:)])
         [self.delegate HTMLtoPDFDidSucceed:self];
-
+    
     if(self.successBlock) {
         self.successBlock(self);
     }
-    
+}
 
+- (void)webViewDidFinishLoad:(UIWebView *)webView
+{
+    if (webView.isLoading) return;
+
+    if (self.jsMessage==nil)
+        [self finishedLoading];
 }
 
 - (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error
@@ -204,6 +218,20 @@
         self.errorBlock(self);
     }
 
+}
+
+- (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType
+{
+    if (self.jsMessage!=nil)
+    {
+        NSString *msg = [[request URL] absoluteString];
+        if ([msg hasSuffix:self.jsMessage])
+        {
+            [self finishedLoading];
+            return NO;
+        }
+    }
+    return YES;
 }
 
 - (void)terminateWebTask
