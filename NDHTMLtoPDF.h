@@ -8,13 +8,12 @@
 //  Released under the MIT license
 
 #import <UIKit/UIKit.h>
+#import "NDHTMLtoPDFBlocks.h"
 
 #define kPaperSizeA4 CGSizeMake(595.2,841.8)
 #define kPaperSizeLetter CGSizeMake(612,792)
 
 @class NDHTMLtoPDF;
-
-typedef void (^NDHTMLtoPDFCompletionBlock)(NDHTMLtoPDF* htmlToPDF);
 
 @protocol NDHTMLtoPDFDelegate <NSObject>
 
