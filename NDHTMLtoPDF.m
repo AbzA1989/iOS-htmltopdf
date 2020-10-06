@@ -20,7 +20,7 @@
 @property (nonatomic, strong) NSString *HTML;
 @property (nonatomic, strong) NSString *PDFpath;
 @property (nonatomic, strong) NSData *PDFdata;
-@property (nonatomic, strong) UIWebView *webview;
+@property (nonatomic, strong) WKWebView *webview;
 @property (nonatomic, assign) CGSize pageSize;
 @property (nonatomic, assign) UIEdgeInsets pageMargins;
 @property (nonatomic, strong) NSString *jsMessage;
@@ -153,8 +153,8 @@
 {
     [super viewDidLoad];
     
-    self.webview = [[UIWebView alloc] initWithFrame:self.view.frame];
-    webview.delegate = self;
+    self.webview = [[WKWebView alloc] initWithFrame:self.view.frame];
+    webview.navigationDelegate = self;
     
     [self.view addSubview:webview];
     
@@ -197,15 +197,15 @@
     }
 }
 
-- (void)webViewDidFinishLoad:(UIWebView *)webView
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation
 {
     if (webView.isLoading) return;
-
+    
     if (self.jsMessage==nil)
         [self finishedLoading];
 }
 
-- (void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error
 {
     if (webView.isLoading) return;
 
@@ -214,30 +214,31 @@
     if (self.delegate && [self.delegate respondsToSelector:@selector(HTMLtoPDFDidFail:)])
         [self.delegate HTMLtoPDFDidFail:self];
     
-    if(self.errorBlock) {
+    if(self.errorBlock)
+    {
         self.errorBlock(self);
     }
-
 }
 
-- (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler
 {
     if (self.jsMessage!=nil)
     {
-        NSString *msg = [[request URL] absoluteString];
+        NSString *msg = [[navigationAction.request URL] absoluteString];
         if ([msg hasSuffix:self.jsMessage])
         {
             [self finishedLoading];
-            return NO;
+            decisionHandler(WKNavigationActionPolicyCancel);
+            return;
         }
     }
-    return YES;
+    decisionHandler(WKNavigationActionPolicyAllow);
 }
 
 - (void)terminateWebTask
 {
     [self.webview stopLoading];
-    self.webview.delegate = nil;
+    self.webview.navigationDelegate = nil;
     [self.webview removeFromSuperview];
     
     [self.view removeFromSuperview];

@@ -9,6 +9,7 @@
 
 #import <UIKit/UIKit.h>
 #import "NDHTMLtoPDFBlocks.h"
+#import <WebKit/WebKit.h>
 
 #define kPaperSizeA4 CGSizeMake(595.2,841.8)
 #define kPaperSizeLetter CGSizeMake(612,792)
@@ -22,7 +23,7 @@
 - (void)HTMLtoPDFDidFail:(NDHTMLtoPDF*)htmlToPDF;
 @end
 
-@interface NDHTMLtoPDF : UIViewController <UIWebViewDelegate>
+@interface NDHTMLtoPDF : UIViewController <WKNavigationDelegate>
 
 @property (nonatomic, copy) NDHTMLtoPDFCompletionBlock successBlock;
 @property (nonatomic, copy) NDHTMLtoPDFCompletionBlock errorBlock;
