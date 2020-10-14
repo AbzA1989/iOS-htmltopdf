@@ -13,8 +13,9 @@
 //  Addons : http://developer.apple.com/library/ios/#samplecode/PrintWebView/Listings/MyPrintPageRenderer_m.html#//apple_ref/doc/uid/DTS40010311-MyPrintPageRenderer_m-DontLinkElementID_7
 
 #import "NDHTMLtoPDF.h"
+#import <WebKit/WebKit.h>
 
-@interface NDHTMLtoPDF ()
+@interface NDHTMLtoPDF ()<WKNavigationDelegate>
 
 @property (nonatomic, strong) NSURL *URL;
 @property (nonatomic, strong) NSString *HTML;
@@ -24,6 +25,7 @@
 @property (nonatomic, assign) CGSize pageSize;
 @property (nonatomic, assign) UIEdgeInsets pageMargins;
 @property (nonatomic, strong) NSString *jsMessage;
+
 @end
 
 @interface UIPrintPageRenderer (PDF)
@@ -214,10 +216,10 @@
     if (self.delegate && [self.delegate respondsToSelector:@selector(HTMLtoPDFDidFail:)])
         [self.delegate HTMLtoPDFDidFail:self];
     
-    if(self.errorBlock)
-    {
+    if(self.errorBlock) {
         self.errorBlock(self);
     }
+
 }
 
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler
