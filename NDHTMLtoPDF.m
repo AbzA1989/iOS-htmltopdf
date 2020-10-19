@@ -7,7 +7,7 @@
 //
 //  Released under the MIT license
 //
-//  Contact cwehrung@nurves.com for any question. 
+//  Contact cwehrung@nurves.com for any question.
 //
 //  Sources : http://www.labs.saachitech.com/2012/10/23/pdf-generation-using-uiprintpagerenderer/
 //  Addons : http://developer.apple.com/library/ios/#samplecode/PrintWebView/Listings/MyPrintPageRenderer_m.html#//apple_ref/doc/uid/DTS40010311-MyPrintPageRenderer_m-DontLinkElementID_7
@@ -18,6 +18,7 @@
 @interface NDHTMLtoPDF ()<WKNavigationDelegate>
 
 @property (nonatomic, strong) NSURL *URL;
+@property (nonatomic, strong) NSURL *fileURL;
 @property (nonatomic, strong) NSString *HTML;
 @property (nonatomic, strong) NSString *PDFpath;
 @property (nonatomic, strong) NSData *PDFdata;
@@ -36,7 +37,7 @@
 
 @implementation NDHTMLtoPDF
 
-@synthesize URL=_URL,webview,delegate=_delegate,PDFpath=_PDFpath,pageSize=_pageSize,pageMargins=_pageMargins;
+@synthesize URL=_URL,webview,delegate=_delegate,PDFpath=_PDFpath,pageSize=_pageSize,pageMargins=_pageMargins,fileURL=_fileURL;
 
 // Create PDF by passing in the URL to a webpage
 + (id)createPDFWithURL:(NSURL*)URL pathForPDF:(NSString*)PDFpath delegate:(id <NDHTMLtoPDFDelegate>)delegate pageSize:(CGSize)pageSize margins:(UIEdgeInsets)pageMargins
@@ -100,11 +101,38 @@
     return creator;
 }
 
++ (id)createPDFWithFileURL:(NSURL*)fileURL baseURL:(NSURL*)baseURL pathForPDF:(NSString*)PDFpath pageSize:(CGSize)pageSize margins:(UIEdgeInsets)pageMargins jsCompletionMessage:(NSString*)jsMessage successBlock:(NDHTMLtoPDFCompletionBlock)successBlock errorBlock:(NDHTMLtoPDFCompletionBlock)errorBlock
+{
+    NDHTMLtoPDF *creator = [[NDHTMLtoPDF alloc] initWithFileURL:fileURL baseURL:baseURL delegate:nil pathForPDF:PDFpath pageSize:pageSize margins:pageMargins];
+    creator.jsMessage = jsMessage;
+    creator.successBlock = successBlock;
+    creator.errorBlock = errorBlock;
+    
+    return creator;
+}
+
 - (id)init
 {
     if (self = [super init])
     {
         self.PDFdata = nil;
+    }
+    return self;
+}
+
+- (id)initWithFileURL:(NSURL*)fileURL baseURL:(NSURL*)URL delegate:(id <NDHTMLtoPDFDelegate>)delegate pathForPDF:(NSString*)PDFpath pageSize:(CGSize)pageSize margins:(UIEdgeInsets)pageMargins
+{
+    if (self = [super init])
+    {
+        self.URL = URL;
+        self.delegate = delegate;
+        self.PDFpath = PDFpath;
+        self.fileURL = fileURL;
+        
+        self.pageMargins = pageMargins;
+        self.pageSize = pageSize;
+        
+        [self forceLoadView];
     }
     return self;
 }
@@ -161,7 +189,14 @@
     [self.view addSubview:webview];
     
     if (self.HTML == nil) {
-        [webview loadRequest:[NSURLRequest requestWithURL:self.URL]];
+        if (self.fileURL == nil)
+        {
+            [webview loadRequest:[NSURLRequest requestWithURL:self.URL]];
+        }
+        else
+        {
+            [webview loadFileURL:self.fileURL allowingReadAccessToURL:self.URL];
+        }
     }else{
         [webview loadHTMLString:self.HTML baseURL:self.URL];
     }
@@ -169,34 +204,36 @@
 
 - (void)finishedLoading
 {
-    UIPrintPageRenderer *render = [[UIPrintPageRenderer alloc] init];
-    
-    [render addPrintFormatter:self.webview.viewPrintFormatter startingAtPageAtIndex:0];
-    
-    CGRect printableRect = CGRectMake(self.pageMargins.left,
-                                      self.pageMargins.top,
-                                      self.pageSize.width - self.pageMargins.left - self.pageMargins.right,
-                                      self.pageSize.height - self.pageMargins.top - self.pageMargins.bottom);
-    
-    CGRect paperRect = CGRectMake(0, 0, self.pageSize.width, self.pageSize.height);
-    
-    [render setValue:[NSValue valueWithCGRect:paperRect] forKey:@"paperRect"];
-    [render setValue:[NSValue valueWithCGRect:printableRect] forKey:@"printableRect"];
-    
-    self.PDFdata = [render printToPDF];
-    
-    if (self.PDFpath) {
-        [self.PDFdata writeToFile: self.PDFpath  atomically: YES];
-    }
-    
-    [self terminateWebTask];
-    
-    if (self.delegate && [self.delegate respondsToSelector:@selector(HTMLtoPDFDidSucceed:)])
-        [self.delegate HTMLtoPDFDidSucceed:self];
-    
-    if(self.successBlock) {
-        self.successBlock(self);
-    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIPrintPageRenderer *render = [[UIPrintPageRenderer alloc] init];
+        
+        [render addPrintFormatter:self.webview.viewPrintFormatter startingAtPageAtIndex:0];
+        
+        CGRect printableRect = CGRectMake(self.pageMargins.left,
+                                          self.pageMargins.top,
+                                          self.pageSize.width - self.pageMargins.left - self.pageMargins.right,
+                                          self.pageSize.height - self.pageMargins.top - self.pageMargins.bottom);
+        
+        CGRect paperRect = CGRectMake(0, 0, self.pageSize.width, self.pageSize.height);
+        
+        [render setValue:[NSValue valueWithCGRect:paperRect] forKey:@"paperRect"];
+        [render setValue:[NSValue valueWithCGRect:printableRect] forKey:@"printableRect"];
+        
+        self.PDFdata = [render printToPDF];
+        
+        if (self.PDFpath) {
+            [self.PDFdata writeToFile: self.PDFpath  atomically: YES];
+        }
+        
+        [self terminateWebTask];
+        
+        if (self.delegate && [self.delegate respondsToSelector:@selector(HTMLtoPDFDidSucceed:)])
+            [self.delegate HTMLtoPDFDidSucceed:self];
+        
+        if(self.successBlock) {
+            self.successBlock(self);
+        }
+    });
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation
