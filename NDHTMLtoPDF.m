@@ -191,7 +191,7 @@
     if (self.HTML == nil) {
         if (self.fileURL == nil)
         {
-            [webview loadRequest:[NSURLRequest requestWithURL:self.URL]];
+            [webview loadFileURL:self.URL allowingReadAccessToURL:self.URL];
         }
         else
         {
